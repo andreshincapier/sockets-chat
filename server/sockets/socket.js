@@ -1,15 +1,16 @@
-const { io } = require('../server');
-const { Usuarios } = require('../classes/usuarios');
-const { crearMensaje } = require('../utils/utils');
+const { io } = require("../server");
+const { Usuarios } = require("../classes/usuarios");
+const { crearMensaje } = require("../utilidades/utilidades");
+const { encryptMessage, decryptMessage } = require("../utilidades/generateJWT");
 
 const usuarios = new Usuarios();
 
-io.on('connection', (client) => {
-  client.on('entrarChat', (data, callback) => {
+io.on("connection", (client) => {
+  client.on("entrarChat", (data, callback) => {
     if (!data.nombre || !data.sala) {
       return callback({
         error: true,
-        mensaje: 'El nombre/sala es necesario',
+        mensaje: "El nombre/sala es necesario",
       });
     }
 
@@ -19,39 +20,58 @@ io.on('connection', (client) => {
 
     client.broadcast
       .to(data.sala)
-      .emit('listaPersona', usuarios.getPersonasPorSala(data.sala));
+      .emit("listaPersona", usuarios.getPersonasPorSala(data.sala));
+    client.broadcast
+      .to(data.sala)
+      .emit(
+        "crearMensaje",
+        crearMensaje("Administrador", `${data.nombre} se unió`)
+      );
 
     callback(usuarios.getPersonasPorSala(data.sala));
   });
 
-  client.on('crearMensaje', (data) => {
+  client.on("crearMensaje", (data, callback) => {
     let persona = usuarios.getPersona(client.id);
     let mensaje = crearMensaje(persona.nombre, data.mensaje);
-    client.broadcast.to(persona.sala).emit('crearMensaje', mensaje);
+    let token = encryptMessage(data.mensaje);
+    mensaje.mensaje = token;
+
+    console.log("**************************");
+    console.log("Menssage encryptado a viajar");
+    console.log(token);
+    console.log("**************************");
+
+    console.log("**************************");
+    let decrypt = decryptMessage(mensaje.mensaje)
+    console.log("Menssage desencriptado recibido");
+    console.log(token);
+    console.log("**************************");
+
+    mensaje.mensaje = decrypt;
+    client.broadcast.to(persona.sala).emit("crearMensaje", mensaje);
+    callback(mensaje);
   });
 
-  client.on('disconnect', () => {
+  client.on("disconnect", () => {
     let personaBorrada = usuarios.borrarPersona(client.id);
 
     client.broadcast
       .to(personaBorrada.sala)
       .emit(
-        'crearMensaje',
-        crearMensaje('Administrador', `${personaBorrada.nombre} salió`)
+        "crearMensaje",
+        crearMensaje("Administrador", `${personaBorrada.nombre} salió`)
       );
     client.broadcast
       .to(personaBorrada.sala)
-      .emit('listaPersona', usuarios.getPersonasPorSala(personaBorrada.sala));
+      .emit("listaPersona", usuarios.getPersonasPorSala(personaBorrada.sala));
   });
 
-  //Mensajes privados
-
-  client.on('mensajePrivado', (data) => {
+  // Mensajes privados
+  client.on("mensajePrivado", (data) => {
     let persona = usuarios.getPersona(client.id);
     client.broadcast
       .to(data.para)
-      .emit('mensajePrivado', crearMensaje(persona.nombre, data.mensaje));
+      .emit("mensajePrivado", crearMensaje(persona.nombre, data.mensaje));
   });
-
-  //Termina el method
 });

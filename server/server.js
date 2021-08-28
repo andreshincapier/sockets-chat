@@ -16,7 +16,14 @@ app.use(express.static(publicPath));
 module.exports.io = socketIO(server);
 require('./sockets/socket');
 
+
+
+
+
 server.listen(port, (err) => {
-  if (err) throw new Error(err);
-  console.log(`Servidor corriendo en puerto ${port}`);
+
+    if (err) throw new Error(err);
+
+    console.log(`Servidor corriendo en puerto ${ port }`);
+
 });
